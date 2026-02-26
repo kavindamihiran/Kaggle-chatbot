@@ -13,15 +13,22 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [apiUrl, setApiUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
   const [tempApiUrl, setTempApiUrl] = useState("");
+  const [tempApiKey, setTempApiKey] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("kaggle-api-url");
-    if (saved) {
-      setApiUrl(saved);
-      setTempApiUrl(saved);
+    const savedUrl = localStorage.getItem("kaggle-api-url");
+    const savedKey = localStorage.getItem("kaggle-api-key");
+    if (savedUrl) {
+      setApiUrl(savedUrl);
+      setTempApiUrl(savedUrl);
+    }
+    if (savedKey) {
+      setApiKey(savedKey);
+      setTempApiKey(savedKey);
     }
   }, []);
 
@@ -40,8 +47,11 @@ export default function ChatPage() {
 
   const saveSettings = () => {
     const url = tempApiUrl.trim();
+    const key = tempApiKey.trim();
     setApiUrl(url);
+    setApiKey(key);
     localStorage.setItem("kaggle-api-url", url);
+    localStorage.setItem("kaggle-api-key", key);
     setShowSettings(false);
   };
 
@@ -78,6 +88,7 @@ export default function ChatPage() {
             content: m.content,
           })),
           apiUrl,
+          apiKey,
         }),
       });
 
@@ -240,6 +251,7 @@ export default function ChatPage() {
             className="icon-btn"
             onClick={() => {
               setTempApiUrl(apiUrl);
+              setTempApiKey(apiKey);
               setShowSettings(true);
             }}
             title="Settings"
@@ -262,7 +274,7 @@ export default function ChatPage() {
                 <>
                   <br />
                   <strong style={{ color: "#a78bfa" }}>
-                    Click ⚙️ to set your ngrok URL first.
+                    Click ⚙️ to set your ngrok URL and API key first.
                   </strong>
                 </>
               )}
@@ -315,7 +327,7 @@ export default function ChatPage() {
             placeholder={
               apiUrl
                 ? "Type your message... (Shift+Enter for new line)"
-                : "Set your ngrok URL in ⚙️ Settings first..."
+                : "Set your ngrok URL & API key in ⚙️ Settings first..."
             }
             rows={1}
             disabled={isLoading}
@@ -341,8 +353,8 @@ export default function ChatPage() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>⚙️ Settings</h2>
             <p className="modal-desc">
-              Paste your ngrok URL from the Kaggle notebook. This URL changes
-              each time you restart the notebook.
+              Connect to your Kaggle-hosted model. Run the notebook to get your
+              ngrok URL and API key, then paste them below.
             </p>
             <div className="form-group">
               <label htmlFor="api-url-input">Ngrok API URL</label>
@@ -355,8 +367,29 @@ export default function ChatPage() {
                 autoFocus
               />
               <p className="hint">
-                Example: https://abc123.ngrok-free.app — the /v1 will be added automatically
+                The URL printed in your Kaggle notebook — /v1 is added automatically
               </p>
+            </div>
+            <div className="form-group">
+              <label htmlFor="api-key-input">API Key</label>
+              <input
+                id="api-key-input"
+                type="password"
+                value={tempApiKey}
+                onChange={(e) => setTempApiKey(e.target.value)}
+                placeholder="your-secret-api-key"
+              />
+              <p className="hint">
+                The API_KEY value from your Kaggle notebook (e.g. my-secret-key-xxx)
+              </p>
+            </div>
+            <div className="setup-steps">
+              <p className="setup-title">📋 Quick Setup</p>
+              <ol>
+                <li>Open your Kaggle notebook and run all cells</li>
+                <li>Copy the <strong>ngrok URL</strong> and <strong>API Key</strong> from the output</li>
+                <li>Paste them above and click Save</li>
+              </ol>
             </div>
             <div className="modal-actions">
               <button

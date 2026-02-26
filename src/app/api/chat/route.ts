@@ -4,16 +4,17 @@ export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, apiUrl } = await req.json();
+    const { messages, apiUrl, apiKey: clientApiKey } = await req.json();
 
     if (!apiUrl) {
       return new Response(
-        JSON.stringify({ error: "API URL not configured. Open Settings to set your ngrok URL." }),
+        JSON.stringify({ error: "API URL not configured. Open Settings to set your ngrok URL and API Key." }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const apiKey = process.env.API_KEY || "my-secret-key-kavinda@kaglle";
+    // Use client-provided key first, then fall back to server env variable
+    const apiKey = clientApiKey || process.env.API_KEY || "";
 
     // Clean up the URL - ensure it ends with /v1
     let baseUrl = apiUrl.replace(/\/+$/, "");
