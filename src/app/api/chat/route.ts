@@ -1,29 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
     const { messages, apiUrl, apiKey: clientApiKey } = await req.json();
 
     if (!apiUrl) {
-      return NextResponse.json(
-        { error: "API URL not configured. Open Settings to set your ngrok URL and API Key." },
-        { status: 400 }
+      return new Response(
+        JSON.stringify({
+          error:
+            "API URL not configured. Open Settings to set your ngrok URL and API Key.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Use client-provided key first, then fall back to server env variable
     const apiKey = clientApiKey || process.env.API_KEY || "";
 
-    // Clean up the URL - ensure it ends with /v1
     let baseUrl = apiUrl.replace(/\/+$/, "");
     if (!baseUrl.endsWith("/v1")) {
       baseUrl += "/v1";
     }
 
-    const endpoint = `${baseUrl}/chat/completions`;
-
-    // First, try a non-streaming request for reliability
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -43,67 +41,153 @@ export async function POST(req: NextRequest) {
         ],
         max_tokens: 2048,
         temperature: 0.7,
-        stream: false,
+        stream: true,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("API Error:", response.status, errorText.substring(0, 500));
 
-      // Check if ngrok returned its HTML warning page
-      if (errorText.includes("ngrok") && errorText.includes("html")) {
-        return NextResponse.json(
-          { error: "Ngrok tunnel returned an HTML page instead of JSON. The tunnel may have expired — restart your Kaggle notebook." },
-          { status: 502 }
+      if (
+        errorText.includes("<html") ||
+        errorText.includes("ngrok")
+      ) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Ngrok tunnel returned HTML instead of JSON. The tunnel may have expired — restart your Kaggle notebook.",
+          }),
+          { status: 502, headers: { "Content-Type": "application/json" } }
         );
       }
 
-      return NextResponse.json(
-        { error: `API Error (${response.status}): ${errorText.substring(0, 200) || "Failed to connect to model server"}` },
-        { status: response.status }
+      return new Response(
+        JSON.stringify({
+          error: `API Error (${response.status}): ${errorText.substring(0, 200) || "Connection failed"}`,
+        }),
+        {
+          status: response.status,
+          headers: { "Content-Type": "application/json" },
+        }
       );
     }
 
-    const contentType = response.headers.get("content-type") || "";
-
-    // If we got HTML back instead of JSON (ngrok warning page)
-    if (contentType.includes("text/html")) {
-      return NextResponse.json(
-        { error: "Received HTML instead of JSON from the API. The ngrok tunnel may have expired — restart your Kaggle notebook." },
-        { status: 502 }
+    // Check if we got HTML back (ngrok warning page on 200)
+    const ct = response.headers.get("content-type") || "";
+    if (ct.includes("text/html")) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Received HTML from ngrok instead of JSON. Restart your Kaggle notebook to get a fresh tunnel.",
+        }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const data = await response.json();
-
-    // Extract the assistant's reply
-    const content = data?.choices?.[0]?.message?.content;
-
-    if (!content) {
-      console.error("Unexpected API response shape:", JSON.stringify(data).substring(0, 500));
-      return NextResponse.json(
-        { error: "The model returned an unexpected response format. Check if your Kaggle server is running." },
-        { status: 500 }
+    const body = response.body;
+    if (!body) {
+      return new Response(
+        JSON.stringify({ error: "No response body from model server." }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    return NextResponse.json({ content });
+    // Transform the upstream SSE into a clean text stream
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    const stream = new ReadableStream({
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            // Flush any remaining buffer
+            if (buffer.trim()) {
+              processBuffer(buffer, controller);
+            }
+            controller.close();
+            return;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete lines from the buffer
+          const lines = buffer.split("\n");
+          // Keep the last (possibly incomplete) line in the buffer
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data: ")) continue;
+
+            const data = trimmed.slice(6);
+            if (data === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const token =
+                parsed.choices?.[0]?.delta?.content ||
+                parsed.choices?.[0]?.text ||
+                "";
+              if (token) {
+                controller.enqueue(new TextEncoder().encode(token));
+              }
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        } catch (err) {
+          controller.error(err);
+        }
+      },
+      cancel() {
+        reader.cancel();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "Transfer-Encoding": "chunked",
+      },
+    });
   } catch (error) {
-    console.error("Chat API error:", error);
     const message =
-      error instanceof Error ? error.message : "Unknown error";
+      error instanceof Error ? error.message : "Unknown error occurred";
 
-    if (message.includes("fetch failed") || message.includes("ECONNREFUSED")) {
-      return NextResponse.json(
-        { error: "Cannot reach the model server. Make sure your Kaggle notebook is running and the ngrok URL is correct." },
-        { status: 503 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: `Server error: ${message}` },
-      { status: 500 }
+    return new Response(
+      JSON.stringify({
+        error: `Cannot reach the model server: ${message}. Make sure your Kaggle notebook is running.`,
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } }
     );
+  }
+}
+
+function processBuffer(
+  buffer: string,
+  controller: ReadableStreamDefaultController
+) {
+  const lines = buffer.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith("data: ")) continue;
+    const data = trimmed.slice(6);
+    if (data === "[DONE]") continue;
+    try {
+      const parsed = JSON.parse(data);
+      const token =
+        parsed.choices?.[0]?.delta?.content ||
+        parsed.choices?.[0]?.text ||
+        "";
+      if (token) {
+        controller.enqueue(new TextEncoder().encode(token));
+      }
+    } catch {
+      // skip
+    }
   }
 }

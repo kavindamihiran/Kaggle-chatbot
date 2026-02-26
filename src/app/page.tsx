@@ -92,19 +92,39 @@ export default function ChatPage() {
         }),
       });
 
-      const data = await response.json();
-
+      // If error, the response is JSON
       if (!response.ok) {
-        throw new Error(data.error || `Server error (${response.status})`);
+        let errorMsg = `Server error (${response.status})`;
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          // ignore parse error
+        }
+        throw new Error(errorMsg);
       }
 
-      if (data.content) {
+      // Success — read as a plain text stream
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response stream available");
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value, { stream: true });
+        fullContent += text;
         setMessages([
           ...newMessages,
-          { role: "assistant", content: data.content },
+          { role: "assistant", content: fullContent },
         ]);
-      } else {
-        throw new Error("No response content received from the model.");
+      }
+
+      if (!fullContent.trim()) {
+        throw new Error("Received an empty response from the model. Check if your Kaggle notebook is still running.");
       }
     } catch (error) {
       const errMsg =
