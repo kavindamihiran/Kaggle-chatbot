@@ -36,6 +36,13 @@ export default function ChatPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Re-focus textarea when loading finishes
+  useEffect(() => {
+    if (!isLoading && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isLoading]);
+
   // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
@@ -138,6 +145,11 @@ export default function ChatPage() {
       ]);
     } finally {
       setIsLoading(false);
+      // Ensure input is accessible
+      setTimeout(() => {
+        textareaRef.current?.focus();
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     }
   };
 
