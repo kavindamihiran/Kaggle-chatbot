@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
+        "ngrok-skip-browser-warning": "true",
+        "User-Agent": "QwenChatBot/1.0",
       },
       body: JSON.stringify({
         model: "qwen2.5-coder-14b-instruct",
