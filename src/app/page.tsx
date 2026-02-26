@@ -74,7 +74,7 @@ export default function ChatPage() {
     setInput("");
     setIsLoading(true);
 
-    // Add empty assistant message for streaming
+    // Add empty assistant message for typing indicator
     const assistantMessage: Message = { role: "assistant", content: "" };
     setMessages([...newMessages, assistantMessage]);
 
@@ -92,58 +92,19 @@ export default function ChatPage() {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || `Server error (${response.status})`
-        );
+        throw new Error(data.error || `Server error (${response.status})`);
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) throw new Error("No response stream");
-
-      let fullContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n").filter((l) => l.trim());
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.error) throw new Error(parsed.error);
-              if (parsed.content) {
-                fullContent += parsed.content;
-                setMessages([
-                  ...newMessages,
-                  { role: "assistant", content: fullContent },
-                ]);
-              }
-            } catch (e) {
-              if (e instanceof Error && e.message !== "Stream interrupted") {
-                // Skip parse errors for incomplete chunks
-              }
-            }
-          }
-        }
-      }
-
-      if (!fullContent) {
+      if (data.content) {
         setMessages([
           ...newMessages,
-          {
-            role: "assistant",
-            content: "I received an empty response. Please try again.",
-          },
+          { role: "assistant", content: data.content },
         ]);
+      } else {
+        throw new Error("No response content received from the model.");
       }
     } catch (error) {
       const errMsg =
