@@ -16,7 +16,7 @@ export default function ChatPage() {
   const [apiKey, setApiKey] = useState("");
   const [tempApiUrl, setTempApiUrl] = useState("");
   const [tempApiKey, setTempApiKey] = useState("");
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -32,8 +32,14 @@ export default function ChatPage() {
     }
   }, []);
 
+  const scrollToBottom = () => {
+    if (chatAreaRef.current) {
+      chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+    }
+  };
+
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom();
   }, [messages]);
 
   // Re-focus textarea when loading finishes
@@ -148,7 +154,7 @@ export default function ChatPage() {
       // Ensure input is accessible
       setTimeout(() => {
         textareaRef.current?.focus();
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        scrollToBottom();
       }, 100);
     }
   };
@@ -256,7 +262,7 @@ export default function ChatPage() {
       </header>
 
       {/* Chat Area */}
-      <div className="chat-area" id="chat-area">
+      <div className="chat-area" id="chat-area" ref={chatAreaRef}>
         {messages.length === 0 ? (
           <div className="welcome">
             <div className="welcome-icon">✨</div>
@@ -306,7 +312,7 @@ export default function ChatPage() {
             </div>
           ))
         )}
-        <div ref={chatEndRef} />
+
       </div>
 
       {/* Input */}
