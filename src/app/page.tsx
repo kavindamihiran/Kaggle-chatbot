@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, KeyboardEvent, FormEvent } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  KeyboardEvent,
+  FormEvent,
+} from "react";
 
 interface Message {
   role: "user" | "assistant";
@@ -18,6 +25,24 @@ export default function ChatPage() {
   const [tempApiKey, setTempApiKey] = useState("");
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Refs to avoid stale closures
+  const apiUrlRef = useRef(apiUrl);
+  const apiKeyRef = useRef(apiKey);
+  const messagesRef = useRef<Message[]>([]);
+  const queueRef = useRef<string[]>([]);
+  const processingRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    apiUrlRef.current = apiUrl;
+  }, [apiUrl]);
+  useEffect(() => {
+    apiKeyRef.current = apiKey;
+  }, [apiKey]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     const savedUrl = localStorage.getItem("kaggle-api-url");
@@ -42,14 +67,12 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Re-focus textarea when loading finishes
   useEffect(() => {
     if (!isLoading && textareaRef.current) {
       textareaRef.current.focus();
     }
   }, [isLoading]);
 
-  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -69,93 +92,165 @@ export default function ChatPage() {
   };
 
   const clearChat = () => {
+    queueRef.current = [];
+    processingRef.current = false;
+    messagesRef.current = [];
     setMessages([]);
+    setIsLoading(false);
   };
 
-  const sendMessage = async (text?: string) => {
-    const msgText = (text || input).trim();
-    if (!msgText || isLoading) return;
-
-    if (!apiUrl) {
-      setShowSettings(true);
-      return;
-    }
-
-    const userMessage: Message = { role: "user", content: msgText };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    setInput("");
+  const processQueue = useCallback(async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
     setIsLoading(true);
 
-    // Add empty assistant message for typing indicator
-    const assistantMessage: Message = { role: "assistant", content: "" };
-    setMessages([...newMessages, assistantMessage]);
-
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: newMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          apiUrl,
-          apiKey,
-        }),
-      });
+      while (queueRef.current.length > 0) {
+        queueRef.current.shift();
 
-      // If error, the response is JSON
-      if (!response.ok) {
-        let errorMsg = `Server error (${response.status})`;
+        // User message is already in messagesRef (added by sendMessage)
+        // Snapshot messages up to this point for the API call
+        const apiMessages = [...messagesRef.current];
+
+        // Add empty assistant placeholder
+        const assistantMsg: Message = { role: "assistant", content: "" };
+        const withAssistant = [...messagesRef.current, assistantMsg];
+        messagesRef.current = withAssistant;
+        setMessages([...withAssistant]);
+
+        const assistantIdx = withAssistant.length - 1;
+
         try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch {
-          // ignore parse error
+          // Abort if the request takes longer than 60 seconds
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+          const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              messages: apiMessages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
+              apiUrl: apiUrlRef.current,
+              apiKey: apiKeyRef.current,
+            }),
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            let errorMsg = `Server error (${response.status})`;
+            try {
+              const errData = await response.json();
+              errorMsg = errData.error || errorMsg;
+            } catch {
+              // ignore parse error
+            }
+            throw new Error(errorMsg);
+          }
+
+          const reader = response.body?.getReader();
+          if (!reader) throw new Error("No response stream available");
+
+          const decoder = new TextDecoder();
+          let fullContent = "";
+
+          // Safety: if no chunk arrives for 30 s, assume the stream stalled.
+          let chunkTimer: ReturnType<typeof setTimeout> | null = null;
+          const resetChunkTimer = () => {
+            if (chunkTimer) clearTimeout(chunkTimer);
+            chunkTimer = setTimeout(() => reader.cancel(), 30000);
+          };
+
+          resetChunkTimer();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              resetChunkTimer();
+              const chunk = decoder.decode(value, { stream: true });
+              fullContent += chunk;
+
+              // Update the assistant message in place
+              const updated = [...messagesRef.current];
+              updated[assistantIdx] = {
+                role: "assistant",
+                content: fullContent,
+              };
+              messagesRef.current = updated;
+              setMessages([...updated]);
+            }
+          } finally {
+            if (chunkTimer) clearTimeout(chunkTimer);
+          }
+
+          if (!fullContent.trim()) {
+            throw new Error(
+              "Received an empty response from the model. Check if your Kaggle notebook is still running.",
+            );
+          }
+        } catch (error) {
+          const errMsg =
+            error instanceof Error
+              ? error.name === "AbortError"
+                ? "Request timed out (60 s). The model server may be overloaded — try again."
+                : error.message
+              : "An unknown error occurred";
+          const updated = [...messagesRef.current];
+          if (assistantIdx < updated.length) {
+            updated[assistantIdx] = {
+              role: "assistant",
+              content: `⚠️ **Error:** ${errMsg}`,
+            };
+          }
+          messagesRef.current = updated;
+          setMessages([...updated]);
         }
-        throw new Error(errorMsg);
       }
-
-      // Success — read as a plain text stream
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response stream available");
-
-      const decoder = new TextDecoder();
-      let fullContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const text = decoder.decode(value, { stream: true });
-        fullContent += text;
-        setMessages([
-          ...newMessages,
-          { role: "assistant", content: fullContent },
-        ]);
-      }
-
-      if (!fullContent.trim()) {
-        throw new Error("Received an empty response from the model. Check if your Kaggle notebook is still running.");
-      }
-    } catch (error) {
-      const errMsg =
-        error instanceof Error ? error.message : "An unknown error occurred";
-      setMessages([
-        ...newMessages,
-        {
-          role: "assistant",
-          content: `⚠️ **Error:** ${errMsg}`,
-        },
-      ]);
     } finally {
+      // Always reset processing state so future messages are never blocked
+      processingRef.current = false;
       setIsLoading(false);
-      // Ensure input is accessible
+
       setTimeout(() => {
         textareaRef.current?.focus();
         scrollToBottom();
       }, 100);
+
+      // Safety: if a message was queued between the while-loop exit and
+      // cleanup, kick off another processing run on the next microtask.
+      if (queueRef.current.length > 0) {
+        queueMicrotask(() => processQueue());
+      }
+    }
+  }, []);
+
+  const sendMessage = async (text?: string) => {
+    const msgText = (text || input).trim();
+    if (!msgText) return;
+
+    if (!apiUrlRef.current) {
+      setShowSettings(true);
+      return;
+    }
+
+    setInput("");
+
+    // Add user message to UI immediately
+    const userMsg: Message = { role: "user", content: msgText };
+    messagesRef.current = [...messagesRef.current, userMsg];
+    setMessages([...messagesRef.current]);
+
+    // Queue the message for API processing
+    queueRef.current.push(msgText);
+
+    // Start processing if not already running
+    if (!processingRef.current) {
+      processQueue();
     }
   };
 
@@ -172,7 +267,6 @@ export default function ChatPage() {
   };
 
   const renderContent = (content: string) => {
-    // Simple markdown-like rendering
     const parts = content.split(/(```[\s\S]*?```)/g);
     return parts.map((part, i) => {
       if (part.startsWith("```") && part.endsWith("```")) {
@@ -185,30 +279,15 @@ export default function ChatPage() {
           </pre>
         );
       }
-      // Handle inline formatting
       const lines = part.split("\n");
       return lines.map((line, j) => {
-        // Replace inline code
-        let rendered = line.replace(
-          /`([^`]+)`/g,
-          "<code>$1</code>"
-        );
-        // Replace bold
-        rendered = rendered.replace(
-          /\*\*([^*]+)\*\*/g,
-          "<strong>$1</strong>"
-        );
-        // Replace italic
-        rendered = rendered.replace(
-          /\*([^*]+)\*/g,
-          "<em>$1</em>"
-        );
-        if (!rendered.trim()) return j < lines.length - 1 ? <br key={`${i}-${j}`} /> : null;
+        let rendered = line.replace(/`([^`]+)`/g, "<code>$1</code>");
+        rendered = rendered.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+        rendered = rendered.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+        if (!rendered.trim())
+          return j < lines.length - 1 ? <br key={`${i}-${j}`} /> : null;
         return (
-          <p
-            key={`${i}-${j}`}
-            dangerouslySetInnerHTML={{ __html: rendered }}
-          />
+          <p key={`${i}-${j}`} dangerouslySetInnerHTML={{ __html: rendered }} />
         );
       });
     });
@@ -230,9 +309,7 @@ export default function ChatPage() {
           <div className="header-info">
             <h1>Qwen AI Chat</h1>
             <p>
-              <span
-                className={`status-dot ${apiUrl ? "" : "offline"}`}
-              ></span>
+              <span className={`status-dot ${apiUrl ? "" : "offline"}`}></span>
               {apiUrl ? "Qwen2.5-Coder-14B" : "Not connected"}
             </p>
           </div>
@@ -304,7 +381,9 @@ export default function ChatPage() {
                     <span className="typing-dot"></span>
                   </div>
                 ) : msg.content.startsWith("⚠️") ? (
-                  <div className="error-toast">{msg.content.replace("⚠️ ", "")}</div>
+                  <div className="error-toast">
+                    {msg.content.replace("⚠️ ", "")}
+                  </div>
                 ) : (
                   renderContent(msg.content)
                 )}
@@ -312,10 +391,9 @@ export default function ChatPage() {
             </div>
           ))
         )}
-
       </div>
 
-      {/* Input */}
+      {/* Input - NEVER disabled */}
       <div className="input-area">
         <form className="input-wrapper" onSubmit={handleSubmit}>
           <textarea
@@ -329,13 +407,13 @@ export default function ChatPage() {
                 : "Set your ngrok URL & API key in ⚙️ Settings first..."
             }
             rows={1}
-            disabled={isLoading}
+            disabled={false}
             id="chat-input"
           />
           <button
             type="submit"
             className="send-btn"
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim()}
             id="send-btn"
           >
             ➤
@@ -366,7 +444,8 @@ export default function ChatPage() {
                 autoFocus
               />
               <p className="hint">
-                The URL printed in your Kaggle notebook — /v1 is added automatically
+                The URL printed in your Kaggle notebook — /v1 is added
+                automatically
               </p>
             </div>
             <div className="form-group">
@@ -379,14 +458,18 @@ export default function ChatPage() {
                 placeholder="your-secret-api-key"
               />
               <p className="hint">
-                The API_KEY value from your Kaggle notebook (e.g. my-secret-key-xxx)
+                The API_KEY value from your Kaggle notebook (e.g.
+                my-secret-key-xxx)
               </p>
             </div>
             <div className="setup-steps">
               <p className="setup-title">📋 Quick Setup</p>
               <ol>
                 <li>Open your Kaggle notebook and run all cells</li>
-                <li>Copy the <strong>ngrok URL</strong> and <strong>API Key</strong> from the output</li>
+                <li>
+                  Copy the <strong>ngrok URL</strong> and{" "}
+                  <strong>API Key</strong> from the output
+                </li>
                 <li>Paste them above and click Save</li>
               </ol>
             </div>
