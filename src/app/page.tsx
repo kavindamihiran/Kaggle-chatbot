@@ -8,6 +8,17 @@ import {
   KeyboardEvent,
   FormEvent,
 } from "react";
+import SetupGuide from "./components/SetupGuide";
+import {
+  IconAlert,
+  IconBook,
+  IconPlug,
+  IconSend,
+  IconSettings,
+  IconSpark,
+  IconTrash,
+  IconUser,
+} from "./components/Icons";
 
 interface Message {
   role: "user" | "assistant";
@@ -19,6 +30,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [apiUrl, setApiUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [tempApiUrl, setTempApiUrl] = useState("");
@@ -77,9 +89,26 @@ export default function ChatPage() {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height =
-        Math.min(textareaRef.current.scrollHeight, 120) + "px";
+        Math.min(textareaRef.current.scrollHeight, 168) + "px";
     }
   }, [input]);
+
+  // Escape closes whichever overlay is on top.
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showGuide) setShowGuide(false);
+      else if (showSettings) setShowSettings(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showGuide, showSettings]);
+
+  const openSettings = () => {
+    setTempApiUrl(apiUrl);
+    setTempApiKey(apiKey);
+    setShowSettings(true);
+  };
 
   const saveSettings = () => {
     const url = tempApiUrl.trim();
@@ -234,7 +263,7 @@ export default function ChatPage() {
     if (!msgText) return;
 
     if (!apiUrlRef.current) {
-      setShowSettings(true);
+      openSettings();
       return;
     }
 
@@ -294,67 +323,82 @@ export default function ChatPage() {
   };
 
   const suggestions = [
-    "Write a Python hello world",
-    "Explain async/await",
-    "Debug a segfault in C",
-    "Create a REST API in Node.js",
+    "Write a Python script that renames files by date",
+    "Explain async/await like I've only used callbacks",
+    "Find the bug in this segfaulting C snippet",
+    "Sketch a REST API for a bookmarking app",
   ];
 
   return (
     <div className="app-container">
-      {/* Header */}
       <header className="header">
         <div className="header-left">
-          <div className="header-logo">🤖</div>
+          <div className="header-logo">
+            <IconSpark size={19} />
+          </div>
           <div className="header-info">
             <h1>Qwen AI Chat</h1>
-            <p>
-              <span className={`status-dot ${apiUrl ? "" : "offline"}`}></span>
-              {apiUrl ? "Qwen2.5-Coder-14B" : "Not connected"}
-            </p>
+            <span className={`status-pill ${apiUrl ? "" : "offline"}`}>
+              <span className="status-dot" />
+              {apiUrl ? "Qwen2.5-Coder-14B · Kaggle T4" : "Not connected"}
+            </span>
           </div>
         </div>
         <div className="header-actions">
           <button
-            className="icon-btn"
-            onClick={clearChat}
-            title="Clear chat"
-            id="clear-chat-btn"
+            className="ghost-btn"
+            onClick={() => setShowGuide(true)}
+            title="Kaggle setup guide"
           >
-            🗑️
+            <IconBook size={17} />
+            <span className="label">Setup guide</span>
           </button>
           <button
             className="icon-btn"
-            onClick={() => {
-              setTempApiUrl(apiUrl);
-              setTempApiKey(apiKey);
-              setShowSettings(true);
-            }}
+            onClick={clearChat}
+            title="Clear conversation"
+            aria-label="Clear conversation"
+            id="clear-chat-btn"
+          >
+            <IconTrash size={17} />
+          </button>
+          <button
+            className="icon-btn"
+            onClick={openSettings}
             title="Settings"
+            aria-label="Settings"
             id="settings-btn"
           >
-            ⚙️
+            <IconSettings size={17} />
           </button>
         </div>
       </header>
 
-      {/* Chat Area */}
       <div className="chat-area" id="chat-area" ref={chatAreaRef}>
         {messages.length === 0 ? (
           <div className="welcome">
-            <div className="welcome-icon">✨</div>
-            <h2>Welcome to Qwen AI Chat</h2>
+            <span className="welcome-badge">
+              <IconSpark size={14} />
+              Qwen2.5-Coder-14B-Instruct
+            </span>
+            <h2>Your own coding model, running on a free Kaggle GPU</h2>
             <p>
-              Powered by Qwen2.5-Coder-14B-Instruct running on Kaggle GPU.
-              {!apiUrl && (
-                <>
-                  <br />
-                  <strong style={{ color: "#a78bfa" }}>
-                    Click ⚙️ to set your ngrok URL and API key first.
-                  </strong>
-                </>
-              )}
+              {apiUrl
+                ? "Connected and ready. Ask a question, paste code, or start from one of these."
+                : "Start the notebook on Kaggle, then paste its ngrok URL and key into Settings — the guide walks through both."}
             </p>
+            {!apiUrl && (
+              <div className="welcome-cta">
+                <button className="btn btn-primary" onClick={() => setShowGuide(true)}>
+                  <IconBook size={16} />
+                  Open the setup guide
+                </button>
+                <button className="btn btn-secondary" onClick={openSettings}>
+                  <IconPlug size={16} />
+                  I have my URL and key
+                </button>
+              </div>
+            )}
             <div className="suggestions">
               {suggestions.map((s) => (
                 <button
@@ -371,18 +415,23 @@ export default function ChatPage() {
           messages.map((msg, i) => (
             <div key={i} className={`message ${msg.role}`}>
               <div className="message-avatar">
-                {msg.role === "assistant" ? "🤖" : "👤"}
+                {msg.role === "assistant" ? (
+                  <IconSpark size={17} />
+                ) : (
+                  <IconUser size={16} />
+                )}
               </div>
               <div className="message-content">
                 {msg.role === "assistant" && !msg.content && isLoading ? (
                   <div className="typing-indicator">
-                    <span className="typing-dot"></span>
-                    <span className="typing-dot"></span>
-                    <span className="typing-dot"></span>
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
                   </div>
                 ) : msg.content.startsWith("⚠️") ? (
                   <div className="error-toast">
-                    {msg.content.replace("⚠️ ", "")}
+                    <IconAlert />
+                    <span>{msg.content.replace("⚠️ ", "").replace(/\*\*/g, "")}</span>
                   </div>
                 ) : (
                   renderContent(msg.content)
@@ -403,8 +452,8 @@ export default function ChatPage() {
             onKeyDown={handleKeyDown}
             placeholder={
               apiUrl
-                ? "Type your message... (Shift+Enter for new line)"
-                : "Set your ngrok URL & API key in ⚙️ Settings first..."
+                ? "Ask anything — Shift + Enter for a new line"
+                : "Connect your Kaggle notebook first to start chatting"
             }
             rows={1}
             disabled={false}
@@ -414,27 +463,39 @@ export default function ChatPage() {
             type="submit"
             className="send-btn"
             disabled={!input.trim()}
+            aria-label="Send message"
             id="send-btn"
           >
-            ➤
+            <IconSend size={18} />
           </button>
         </form>
         <p className="input-hint">
-          Qwen2.5-Coder-14B-Instruct · Kaggle T4 GPU · Streaming enabled
+          Responses stream from your own Kaggle notebook. Keys stay in this
+          browser.
         </p>
       </div>
 
-      {/* Settings Modal */}
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>⚙️ Settings</h2>
-            <p className="modal-desc">
-              Connect to your Kaggle-hosted model. Run the notebook to get your
-              ngrok URL and API key, then paste them below.
-            </p>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Connection settings"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="modal-head">
+              <div>
+                <h2>Connection</h2>
+                <p className="modal-desc">
+                  Paste the ngrok URL and API key printed by your Kaggle
+                  notebook. Both are stored in this browser only.
+                </p>
+              </div>
+            </header>
+
             <div className="form-group">
-              <label htmlFor="api-url-input">Ngrok API URL</label>
+              <label htmlFor="api-url-input">Ngrok URL</label>
               <input
                 id="api-url-input"
                 type="text"
@@ -444,12 +505,13 @@ export default function ChatPage() {
                 autoFocus
               />
               <p className="hint">
-                The URL printed in your Kaggle notebook — /v1 is added
-                automatically
+                From cell 2 of the notebook — <code>/v1</code> is appended for
+                you.
               </p>
             </div>
+
             <div className="form-group">
-              <label htmlFor="api-key-input">API Key</label>
+              <label htmlFor="api-key-input">API key</label>
               <input
                 id="api-key-input"
                 type="password"
@@ -458,21 +520,27 @@ export default function ChatPage() {
                 placeholder="your-secret-api-key"
               />
               <p className="hint">
-                The API_KEY value from your Kaggle notebook (e.g.
-                my-secret-key-xxx)
+                The <code>API_KEY</code> value you chose in that same cell.
               </p>
             </div>
-            <div className="setup-steps">
-              <p className="setup-title">📋 Quick Setup</p>
-              <ol>
-                <li>Open your Kaggle notebook and run all cells</li>
-                <li>
-                  Copy the <strong>ngrok URL</strong> and{" "}
-                  <strong>API Key</strong> from the output
-                </li>
-                <li>Paste them above and click Save</li>
-              </ol>
+
+            <div className="modal-note">
+              <IconBook size={16} />
+              <span>
+                No notebook running yet?{" "}
+                <button
+                  className="link-btn"
+                  onClick={() => {
+                    setShowSettings(false);
+                    setShowGuide(true);
+                  }}
+                >
+                  Open the Kaggle setup guide
+                </button>{" "}
+                — four cells, about five minutes.
+              </span>
             </div>
+
             <div className="modal-actions">
               <button
                 className="btn btn-secondary"
@@ -481,11 +549,21 @@ export default function ChatPage() {
                 Cancel
               </button>
               <button className="btn btn-primary" onClick={saveSettings}>
-                Save & Connect
+                Save and connect
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {showGuide && (
+        <SetupGuide
+          onClose={() => setShowGuide(false)}
+          onOpenSettings={() => {
+            setShowGuide(false);
+            openSettings();
+          }}
+        />
       )}
     </div>
   );

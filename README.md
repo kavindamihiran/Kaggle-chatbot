@@ -30,6 +30,9 @@ A sleek, open-source chatbot powered by **Qwen2.5-Coder-14B-Instruct** — hoste
 
 ## 🚀 Quick Start
 
+> 💡 The app ships with this same guide built in — click **Setup guide** in the
+> header for copy-ready notebook cells.
+
 ### Step 1: Set Up the AI Backend on Kaggle
 
 1. Go to [kaggle.com](https://www.kaggle.com) → **New Notebook**
