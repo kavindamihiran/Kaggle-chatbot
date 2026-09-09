@@ -9,6 +9,16 @@ what changed along with why.
 
 ---
 
+## 2026-09-09 | Discord webhook verified
+
+Confirmed the notification pipeline end to end. The webhook URL was initially
+saved as an environment secret on the Production environment, where the workflow
+could not see it, since the notify job does not declare an `environment:` key.
+Moving it to a repository secret fixed it.
+
+If notifications ever go quiet, check that `DISCORD_WEBHOOK_URL` is listed under
+Repository secrets rather than under an environment.
+
 ## 2026-09-09 | Repository setup
 
 Brought the repository in line with the team project setup standard.
