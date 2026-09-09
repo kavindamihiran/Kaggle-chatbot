@@ -1,6 +1,6 @@
 # 🤖 Qwen AI Chat
 
-A sleek, open-source chatbot powered by **Qwen2.5-Coder-14B-Instruct** — hosted free on Kaggle GPU, with a premium Next.js frontend deployable to Vercel.
+A sleek, open-source chatbot powered by **Qwen2.5-Coder-14B-Instruct**, hosted free on Kaggle GPU, with a premium Next.js frontend deployable to Vercel.
 
 > **Free GPU + Free Hosting = Your own AI chatbot at $0 cost.**
 
@@ -8,11 +8,11 @@ A sleek, open-source chatbot powered by **Qwen2.5-Coder-14B-Instruct** — hoste
 
 ## ✨ Features
 
-- 🧠 **Qwen2.5-Coder-14B** — powerful coding & general AI model
-- ⚡ **Streaming responses** — tokens appear in real-time
-- 🌙 **Premium dark UI** — glassmorphism, animations, responsive
-- 🔑 **Bring your own API** — anyone can connect their own Kaggle backend
-- 🚀 **One-click Vercel deploy** — no server management needed
+- 🧠 **Qwen2.5-Coder-14B**: powerful coding & general AI model
+- ⚡ **Streaming responses**: tokens appear in real-time
+- 🌙 **Premium dark UI**: glassmorphism, animations, responsive
+- 🔑 **Bring your own API**: anyone can connect their own Kaggle backend
+- 🚀 **One-click Vercel deploy**: no server management needed
 
 ---
 
@@ -30,7 +30,7 @@ A sleek, open-source chatbot powered by **Qwen2.5-Coder-14B-Instruct** — hoste
 
 ## 🚀 Quick Start
 
-> 💡 The app ships with this same guide built in — click **Setup guide** in the
+> 💡 The app ships with this same guide built in. Click **Setup guide** in the
 > header for copy-ready notebook cells.
 
 ### Step 1: Set Up the AI Backend on Kaggle
@@ -131,7 +131,7 @@ for i in range(60):
 
 1. **Fork/clone** this repo and push to your GitHub
 2. Go to [vercel.com](https://vercel.com) → **Add New Project** → Import your repo
-3. Click **Deploy** (no env vars needed — users enter their own keys)
+3. Click **Deploy** (no env vars needed, users enter their own keys)
 4. Your chatbot is live! 🎉
 
 ---
@@ -188,10 +188,10 @@ A: Yes! Change the `repo_id` and `filename` in Cell 1 to any GGUF model on Huggi
 A: Kaggle GPU sessions last up to 12 hours. After that, restart the notebook.
 
 **Q: Is this truly free?**
-A: Yes — Kaggle gives free GPU, Vercel gives free hosting, ngrok gives a free tunnel.
+A: Yes. Kaggle gives free GPU, Vercel gives free hosting, ngrok gives a free tunnel.
 
 ---
 
 ## 📜 License
 
-MIT — use it however you want.
+MIT. Use it however you want.
