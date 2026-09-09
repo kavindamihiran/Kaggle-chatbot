@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Qwen AI Chat — Powered by Qwen2.5-Coder",
+  title: "Qwen AI Chat | Powered by Qwen2.5-Coder",
   description:
     "A premium AI chatbot interface powered by Qwen2.5-Coder-14B-Instruct, hosted on Kaggle with GPU acceleration.",
   keywords: ["AI", "chatbot", "Qwen", "coding assistant", "LLM"],

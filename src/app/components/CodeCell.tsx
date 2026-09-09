@@ -18,7 +18,7 @@ export default function CodeCell({
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Clipboard can be blocked — the code stays selectable either way.
+      // Clipboard can be blocked, but the code stays selectable either way.
     }
   };
 

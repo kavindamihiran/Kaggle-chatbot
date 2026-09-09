@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
         return new Response(
           JSON.stringify({
             error:
-              "Ngrok tunnel returned HTML instead of JSON. The tunnel may have expired — restart your Kaggle notebook.",
+              "Ngrok tunnel returned HTML instead of JSON. The tunnel may have expired. Restart your Kaggle notebook.",
           }),
           { status: 502, headers: { "Content-Type": "application/json" } },
         );
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
 
             const data = trimmed.slice(6);
             if (data === "[DONE]") {
-              // Model finished — close stream immediately instead of
+              // Model finished, so close the stream immediately instead of
               // waiting for the upstream HTTP connection to close
               // (ngrok / vLLM often keep the connection alive).
               streamDone = true;
