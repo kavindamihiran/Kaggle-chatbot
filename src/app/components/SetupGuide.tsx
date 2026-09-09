@@ -3,7 +3,7 @@
 import CodeCell from "./CodeCell";
 import { IconClose, IconExternal } from "./Icons";
 
-const CELL_1 = `# Cell 1 — install dependencies & download the model
+const CELL_1 = `# Cell 1: install dependencies & download the model
 !pip uninstall -y llama-cpp-python
 !pip install pyngrok openai huggingface_hub -q
 !pip install llama-cpp-python[server] --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 -q --no-cache-dir
@@ -18,7 +18,7 @@ model_path = hf_hub_download(
 )
 print("Model downloaded:", model_path)`;
 
-const CELL_2 = `# Cell 2 — open the ngrok tunnel
+const CELL_2 = `# Cell 2: open the ngrok tunnel
 from pyngrok import ngrok
 
 NGROK_TOKEN = "YOUR_NGROK_TOKEN"   # free at ngrok.com
@@ -35,7 +35,7 @@ print("API URL:", public_url_str)
 print("API KEY:", API_KEY)
 print("=" * 60)`;
 
-const CELL_3 = `# Cell 3 — start the model server
+const CELL_3 = `# Cell 3: start the model server
 import subprocess, os
 
 server = subprocess.Popen([
@@ -54,7 +54,7 @@ server = subprocess.Popen([
 )
 print("Starting server... (30-60 seconds)")`;
 
-const CELL_4 = `# Cell 4 — wait until the server answers
+const CELL_4 = `# Cell 4: wait until the server answers
 import requests, time
 
 for i in range(60):
@@ -95,7 +95,7 @@ export default function SetupGuide({
             <h2>Run the model on Kaggle</h2>
             <p className="modal-desc">
               Kaggle gives you a free T4 GPU for up to 12 hours a session. You
-              run the model there and point this chat at it — nothing to install
+              run the model there and point this chat at it, with nothing to install
               locally.
             </p>
           </div>
@@ -142,7 +142,7 @@ export default function SetupGuide({
                 </li>
               </ul>
               <p className="note">
-                Internet access requires a phone-verified Kaggle account — verify
+                Internet access requires a phone-verified Kaggle account. Verify
                 under Settings if the toggle is greyed out.
               </p>
               <a
@@ -177,7 +177,7 @@ export default function SetupGuide({
               <h3>Connect this chat</h3>
               <p>
                 Cell 4 prints the ngrok URL and your key once the server is
-                ready. Paste both into Settings and save — they are stored in
+                ready. Paste both into Settings and save. They are stored in
                 your browser only, and <code>/v1</code> is appended for you.
               </p>
               <button className="btn btn-primary" onClick={onOpenSettings}>
@@ -192,7 +192,7 @@ export default function SetupGuide({
               <div>
                 <dt>The URL changed after a restart</dt>
                 <dd>
-                  Expected — a free ngrok tunnel gets a new URL each run. Paste
+                  Expected, since a free ngrok tunnel gets a new URL each run. Paste
                   the new one into Settings.
                 </dd>
               </div>

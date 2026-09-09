@@ -4,7 +4,7 @@
    Design tokens
    ============================================================ */
 :root {
-  /* Surfaces — cool near-black, very low saturation */
+  /* Surfaces: cool near-black, very low saturation */
   --canvas: #0b0b0f;
   --surface-1: #111117;
   --surface-2: #16161e;
@@ -77,7 +77,7 @@ body {
   overflow: hidden;
 }
 
-/* A single soft light source, top-centre — depth without gradient soup. */
+/* A single soft light source, top-centre, for depth without gradient soup. */
 body::before {
   content: '';
   position: fixed;

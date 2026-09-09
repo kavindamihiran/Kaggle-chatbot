@@ -226,7 +226,7 @@ export default function ChatPage() {
           const errMsg =
             error instanceof Error
               ? error.name === "AbortError"
-                ? "Request timed out (60 s). The model server may be overloaded — try again."
+                ? "Request timed out (60 s). The model server may be overloaded. Try again."
                 : error.message
               : "An unknown error occurred";
           const updated = [...messagesRef.current];
@@ -385,7 +385,7 @@ export default function ChatPage() {
             <p>
               {apiUrl
                 ? "Connected and ready. Ask a question, paste code, or start from one of these."
-                : "Start the notebook on Kaggle, then paste its ngrok URL and key into Settings — the guide walks through both."}
+                : "Start the notebook on Kaggle, then paste its ngrok URL and key into Settings. The guide walks through both."}
             </p>
             {!apiUrl && (
               <div className="welcome-cta">
@@ -452,7 +452,7 @@ export default function ChatPage() {
             onKeyDown={handleKeyDown}
             placeholder={
               apiUrl
-                ? "Ask anything — Shift + Enter for a new line"
+                ? "Ask anything. Shift + Enter for a new line"
                 : "Connect your Kaggle notebook first to start chatting"
             }
             rows={1}
@@ -505,7 +505,7 @@ export default function ChatPage() {
                 autoFocus
               />
               <p className="hint">
-                From cell 2 of the notebook — <code>/v1</code> is appended for
+                From cell 2 of the notebook. <code>/v1</code> is appended for
                 you.
               </p>
             </div>
@@ -537,7 +537,7 @@ export default function ChatPage() {
                 >
                   Open the Kaggle setup guide
                 </button>{" "}
-                — four cells, about five minutes.
+                (four cells, about five minutes).
               </span>
             </div>
 
